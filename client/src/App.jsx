@@ -13,12 +13,21 @@ import StudentViewCourseDetailsPage from "./pages/student/course-details";
 import PaypalPaymentReturnPage from "./pages/student/payment-return";
 import StudentCoursesPage from "./pages/student/student-courses";
 import StudentViewCourseProgressPage from "./pages/student/course-progress";
-
+import KhaltiPaymentReturnPage from "./pages/student/KhaltiPaymentReturnPage";
 function App() {
   const { auth } = useContext(AuthContext);
 
   return (
     <Routes>
+      <Route
+        path="/payment/khalti-return"
+        element={
+          <RouteGuard authenticated={auth?.authenticate} user={auth?.user}>
+            <KhaltiPaymentReturnPage />
+          </RouteGuard>
+        }
+      />
+
       <Route
         path="/auth"
         element={

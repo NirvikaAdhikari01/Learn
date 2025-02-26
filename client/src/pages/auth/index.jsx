@@ -41,11 +41,20 @@ function AuthPage() {
       signUpFormData &&
       signUpFormData.userName !== "" &&
       signUpFormData.userEmail !== "" &&
-      signUpFormData.password !== ""
+      signUpFormData.password !== "" &&
+      signUpFormData.role !== "" &&
+      (signUpFormData.role !== "instructor" || signUpFormData.esewaNumber !== "") // Ensure esewaNumber if role is instructor
     );
   }
 
-  console.log(signInFormData);
+  function handleRoleChange(event) {
+    const selectedRole = event.target.value;
+    setSignUpFormData({ 
+      ...signUpFormData, 
+      role: selectedRole, 
+      esewaNumber: selectedRole === "instructor" ? "" : null // Reset esewaNumber if not an instructor
+    });
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -95,15 +104,44 @@ function AuthPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                <CommonForm
-                  formControls={signUpFormControls}
-                  buttonText={"Sign Up"}
-                  formData={signUpFormData}
-                  setFormData={setSignUpFormData}
-                  isButtonDisabled={!checkIfSignUpFormIsValid()}
-                  handleSubmit={handleRegisterUser}
+            <CommonForm
+              formControls={signUpFormControls}
+              buttonText={"Sign Up"}
+              formData={signUpFormData}
+              setFormData={setSignUpFormData}
+              isButtonDisabled={!checkIfSignUpFormIsValid()}
+              handleSubmit={handleRegisterUser}
+            />
+
+            {/* Role Selection Dropdown */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Select Role</label>
+              <select
+                value={signUpFormData.role || ""}
+                onChange={handleRoleChange}
+                className="w-full p-2 border rounded-md"
+              >
+                <option value="">Choose Role</option>
+                <option value="user">Student</option>
+                <option value="instructor">Instructor</option>
+              </select>
+            </div>
+
+            {/* Esewa Number Input (Visible only if Instructor is selected) */}
+            {signUpFormData.role === "instructor" && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Esewa Number</label>
+                <input
+                  type="text"
+                  placeholder="Enter your eSewa Number"
+                  value={signUpFormData.esewaNumber || ""}
+                  onChange={(e) => setSignUpFormData({ ...signUpFormData, esewaNumber: e.target.value })}
+                  className="w-full p-2 border rounded-md"
                 />
-              </CardContent>
+              </div>
+            )}
+</CardContent>
+
             </Card>
           </TabsContent>
         </Tabs>

@@ -16,32 +16,60 @@ export default function AuthProvider({ children }) {
 
   async function handleRegisterUser(event) {
     event.preventDefault();
-    const data = await registerService(signUpFormData);
+
+    if (!signUpFormData.role) {
+      alert("Please select a role (Student or Instructor).");
+      return;
+    }
+
+    // Ensure eSewa number is provided for instructors
+    if (signUpFormData.role === "instructor" && !signUpFormData.esewaNumber) {
+      alert("Please enter your eSewa number.");
+      return;
+    }
+
+    try {
+      const response = await registerService(signUpFormData);
+      if (response.success) {
+        alert("Registration successful! Please log in.");
+        setSignUpFormData(initialSignUpFormData);
+      } else {
+        alert(response.message || "Registration failed. Try again.");
+      }
+    } catch (error) {
+      console.error("Registration Error:", error);
+      alert("Something went wrong. Please try again.");
+    }
   }
 
   async function handleLoginUser(event) {
     event.preventDefault();
-    const data = await loginService(signInFormData);
-    console.log(data, "datadatadatadatadata");
 
-    if (data.success) {
-      sessionStorage.setItem(
-        "accessToken",
-        JSON.stringify(data.data.accessToken)
-      );
-      setAuth({
-        authenticate: true,
-        user: data.data.user,
-      });
-    } else {
+    try {
+      const data = await loginService(signInFormData);
+      if (data.success) {
+        sessionStorage.setItem("accessToken", JSON.stringify(data.data.accessToken));
+        sessionStorage.setItem("userRole", data.data.user.role); // Store role in session
+        setAuth({
+          authenticate: true,
+          user: data.data.user,
+        });
+      } else {
+        alert("Invalid credentials. Please try again.");
+        setAuth({
+          authenticate: false,
+          user: null,
+        });
+      }
+    } catch (error) {
+      console.error("Login Error:", error);
+      alert("Something went wrong. Please try again.");
       setAuth({
         authenticate: false,
         user: null,
       });
     }
   }
-
-  //check auth user
 
   async function checkAuthUser() {
     try {
@@ -51,27 +79,26 @@ export default function AuthProvider({ children }) {
           authenticate: true,
           user: data.data.user,
         });
-        setLoading(false);
       } else {
         setAuth({
           authenticate: false,
           user: null,
         });
-        setLoading(false);
       }
     } catch (error) {
-      console.log(error);
-      if (!error?.response?.data?.success) {
-        setAuth({
-          authenticate: false,
-          user: null,
-        });
-        setLoading(false);
-      }
+      console.log("Auth Check Error:", error);
+      setAuth({
+        authenticate: false,
+        user: null,
+      });
+    } finally {
+      setLoading(false);
     }
   }
 
   function resetCredentials() {
+    sessionStorage.removeItem("accessToken");
+    sessionStorage.removeItem("userRole");
     setAuth({
       authenticate: false,
       user: null,
@@ -81,8 +108,6 @@ export default function AuthProvider({ children }) {
   useEffect(() => {
     checkAuthUser();
   }, []);
-
-  console.log(auth, "gf");
 
   return (
     <AuthContext.Provider

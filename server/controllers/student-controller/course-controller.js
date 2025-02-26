@@ -4,44 +4,42 @@ const StudentCourses = require("../../models/StudentCourses");
 const getAllStudentViewCourses = async (req, res) => {
   try {
     const {
-      category = [],
-      level = [],
-      primaryLanguage = [],
+      category = "",
+      level = "",
+      primaryLanguage = "",
       sortBy = "price-lowtohigh",
     } = req.query;
 
     console.log(req.query, "req.query");
 
     let filters = {};
-    if (category.length) {
-      filters.category = { $in: category.split(",") };
+    if (category) {
+      const categoryArray = category.split(",");
+      if (categoryArray.length) filters.category = { $in: categoryArray };
     }
-    if (level.length) {
-      filters.level = { $in: level.split(",") };
+    if (level) {
+      const levelArray = level.split(",");
+      if (levelArray.length) filters.level = { $in: levelArray };
     }
-    if (primaryLanguage.length) {
-      filters.primaryLanguage = { $in: primaryLanguage.split(",") };
+    if (primaryLanguage) {
+      const langArray = primaryLanguage.split(",");
+      if (langArray.length) filters.primaryLanguage = { $in: langArray };
     }
 
     let sortParam = {};
     switch (sortBy) {
       case "price-lowtohigh":
         sortParam.pricing = 1;
-
         break;
       case "price-hightolow":
         sortParam.pricing = -1;
-
         break;
       case "title-atoz":
         sortParam.title = 1;
-
         break;
       case "title-ztoa":
         sortParam.title = -1;
-
         break;
-
       default:
         sortParam.pricing = 1;
         break;
@@ -54,10 +52,10 @@ const getAllStudentViewCourses = async (req, res) => {
       data: coursesList,
     });
   } catch (e) {
-    console.log(e);
+    console.error(e);
     res.status(500).json({
       success: false,
-      message: "Some error occured!",
+      message: "Some error occurred!",
     });
   }
 };
@@ -80,10 +78,10 @@ const getStudentViewCourseDetails = async (req, res) => {
       data: courseDetails,
     });
   } catch (e) {
-    console.log(e);
+    console.error(e);
     res.status(500).json({
       success: false,
-      message: "Some error occured!",
+      message: "Some error occurred!",
     });
   }
 };
@@ -91,21 +89,27 @@ const getStudentViewCourseDetails = async (req, res) => {
 const checkCoursePurchaseInfo = async (req, res) => {
   try {
     const { id, studentId } = req.params;
-    const studentCourses = await StudentCourses.findOne({
-      userId: studentId,
-    });
+    const studentCourses = await StudentCourses.findOne({ userId: studentId });
+
+    if (!studentCourses || !studentCourses.courses) {
+      return res.status(200).json({
+        success: true,
+        data: false,
+      });
+    }
 
     const ifStudentAlreadyBoughtCurrentCourse =
-      studentCourses.courses.findIndex((item) => item.courseId === id) > -1;
+      studentCourses.courses.some((item) => item.courseId.toString() === id);
+
     res.status(200).json({
       success: true,
       data: ifStudentAlreadyBoughtCurrentCourse,
     });
   } catch (e) {
-    console.log(e);
+    console.error(e);
     res.status(500).json({
       success: false,
-      message: "Some error occured!",
+      message: "Some error occurred!",
     });
   }
 };

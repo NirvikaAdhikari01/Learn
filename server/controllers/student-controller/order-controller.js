@@ -3,131 +3,106 @@ const Order = require("../../models/Order");
 const Course = require("../../models/Course");
 const StudentCourses = require("../../models/StudentCourses");
 
+const axios = require("axios");
+
+
+
+
 const createOrder = async (req, res) => {
   try {
     const {
       userId,
       userName,
       userEmail,
-      orderStatus,
-      paymentMethod,
-      paymentStatus,
-      orderDate,
-      paymentId,
-      payerId,
       instructorId,
       instructorName,
       courseImage,
       courseTitle,
       courseId,
       coursePricing,
+      token, // Khalti payment token from frontend
     } = req.body;
 
-    const create_payment_json = {
-      intent: "sale",
-      payer: {
-        payment_method: "paypal",
-      },
-      redirect_urls: {
-        return_url: `${process.env.CLIENT_URL}/payment-return`,
-        cancel_url: `${process.env.CLIENT_URL}/payment-cancel`,
-      },
-      transactions: [
-        {
-          item_list: {
-            items: [
-              {
-                name: courseTitle,
-                sku: courseId,
-                price: coursePricing,
-                currency: "USD",
-                quantity: 1,
-              },
-            ],
-          },
-          amount: {
-            currency: "USD",
-            total: coursePricing.toFixed(2),
-          },
-          description: courseTitle,
-        },
-      ],
+    // Khalti API credentials
+    const khaltiSecretKey = "4e7efd1b1df14733bdf04c0f83f0a031"; // Live Secret Key
+
+    // Prepare Khalti verification request
+    const khaltiVerifyUrl = "https://khalti.com/api/v2/payment/verify/";
+
+    const verifyData = {
+      token: token,
+      amount: coursePricing * 100, // Khalti uses paisa (1 NPR = 100 paisa)
     };
 
-    paypal.payment.create(create_payment_json, async (error, paymentInfo) => {
-      if (error) {
-        console.log(error);
-        return res.status(500).json({
-          success: false,
-          message: "Error while creating paypal payment!",
-        });
-      } else {
-        const newlyCreatedCourseOrder = new Order({
-          userId,
-          userName,
-          userEmail,
-          orderStatus,
-          paymentMethod,
-          paymentStatus,
-          orderDate,
-          paymentId,
-          payerId,
-          instructorId,
-          instructorName,
-          courseImage,
-          courseTitle,
-          courseId,
-          coursePricing,
-        });
+    const headers = {
+      Authorization: `Key ${khaltiSecretKey}`,
+      "Content-Type": "application/json",
+    };
 
-        await newlyCreatedCourseOrder.save();
+    // Verify payment with Khalti API
+    const response = await axios.post(khaltiVerifyUrl, verifyData, { headers });
 
-        const approveUrl = paymentInfo.links.find(
-          (link) => link.rel == "approval_url"
-        ).href;
+    if (response.data.state.name !== "Completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Payment verification failed!",
+      });
+    }
 
-        res.status(201).json({
-          success: true,
-          data: {
-            approveUrl,
-            orderId: newlyCreatedCourseOrder._id,
-          },
-        });
-      }
+    // Create order after successful payment
+    const newlyCreatedCourseOrder = new Order({
+      userId,
+      userName,
+      userEmail,
+      orderStatus: "confirmed",
+      paymentMethod: "Khalti",
+      paymentStatus: "paid",
+      orderDate: new Date(),
+      paymentId: response.data.idx, // Payment ID from Khalti
+      instructorId,
+      instructorName,
+      courseImage,
+      courseTitle,
+      courseId,
+      coursePricing,
+    });
+
+    await newlyCreatedCourseOrder.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Payment successful and order created!",
+      orderId: newlyCreatedCourseOrder._id,
     });
   } catch (err) {
-    console.log(err);
+    console.error("Khalti Payment Error:", err);
     res.status(500).json({
       success: false,
-      message: "Some error occured!",
+      message: "Error processing Khalti payment!",
     });
   }
 };
 
+
 const capturePaymentAndFinalizeOrder = async (req, res) => {
   try {
-    const { paymentId, payerId, orderId } = req.body;
+    const { orderId } = req.body;
 
     let order = await Order.findById(orderId);
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: "Order can not be found",
+        message: "Order not found",
       });
     }
 
     order.paymentStatus = "paid";
     order.orderStatus = "confirmed";
-    order.paymentId = paymentId;
-    order.payerId = payerId;
-
     await order.save();
 
-    //update out student course model
-    const studentCourses = await StudentCourses.findOne({
-      userId: order.userId,
-    });
+    // Update StudentCourses
+    const studentCourses = await StudentCourses.findOne({ userId: order.userId });
 
     if (studentCourses) {
       studentCourses.courses.push({
@@ -138,7 +113,6 @@ const capturePaymentAndFinalizeOrder = async (req, res) => {
         dateOfPurchase: order.orderDate,
         courseImage: order.courseImage,
       });
-
       await studentCourses.save();
     } else {
       const newStudentCourses = new StudentCourses({
@@ -154,11 +128,10 @@ const capturePaymentAndFinalizeOrder = async (req, res) => {
           },
         ],
       });
-
       await newStudentCourses.save();
     }
 
-    //update the course schema students
+    // Update Course Schema to add student
     await Course.findByIdAndUpdate(order.courseId, {
       $addToSet: {
         students: {
@@ -172,16 +145,60 @@ const capturePaymentAndFinalizeOrder = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Order confirmed",
+      message: "Order confirmed successfully!",
       data: order,
     });
   } catch (err) {
-    console.log(err);
+    console.error("Error in finalizing order:", err);
     res.status(500).json({
       success: false,
-      message: "Some error occured!",
+      message: "An error occurred while confirming the order!",
     });
   }
 };
 
-module.exports = { createOrder, capturePaymentAndFinalizeOrder };
+const initiateKhaltiPayment = async (req, res) => {
+  try {
+    const { userId, coursePricing, purchaseOrderId, purchaseOrderName } = req.body;
+
+    const khaltiInitiateUrl = "https://sandbox.khalti.com/api/v2/epayment/initiate/";
+    const khaltiSecretKey = "4e7efd1b1df14733bdf04c0f83f0a031"; // Live Secret Key
+
+    const requestBody = {
+      return_url: "https://your-frontend.com/payment-success",
+      website_url: "https://your-website.com",
+      amount: coursePricing * 100, // Khalti requires amount in paisa
+      purchase_order_id: purchaseOrderId,
+      purchase_order_name: purchaseOrderName,
+      customer_info: {
+        user_id: userId,
+      },
+    };
+
+    const headers = {
+      Authorization: `Key ${khaltiSecretKey}`,
+      "Content-Type": "application/json",
+    };
+
+    // Initiate Payment Request
+    const response = await axios.post(khaltiInitiateUrl, requestBody, { headers });
+
+    res.status(200).json({
+      success: true,
+      message: "Payment initiation successful",
+      pidx: response.data.pidx, // Unique Payment ID
+      payment_url: response.data.payment_url, // URL for user to complete payment
+    });
+  } catch (error) {
+    console.error("Khalti Initiation Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error initiating Khalti payment!",
+    });
+  }
+};
+
+module.exports = { createOrder, capturePaymentAndFinalizeOrder, initiateKhaltiPayment };
+
+
+

@@ -1,5 +1,5 @@
 import { courseCategories } from "@/config";
-import banner from "../../../../public/banner-img.png";
+
 import { Button } from "@/components/ui/button";
 import { useContext, useEffect } from "react";
 import { StudentContext } from "@/context/student-context";
@@ -62,12 +62,13 @@ function StudentHomePage() {
           </p>
         </div>
         <div className="lg:w-full mb-8 lg:mb-0">
-          <img
-            src={banner}
-            width={600}
-            height={400}
-            className="w-full h-auto rounded-lg shadow-lg"
-          />
+        <img
+        src="/banner-img.png"
+        width={600}
+        height={400}
+        className="w-full h-auto rounded-lg shadow-lg"
+/>
+
         </div>
       </section>
       <section className="py-8 px-4 lg:px-8 bg-gray-100">
@@ -91,6 +92,7 @@ function StudentHomePage() {
           {studentViewCoursesList && studentViewCoursesList.length > 0 ? (
             studentViewCoursesList.map((courseItem) => (
               <div
+                key={courseItem?._id}
                 onClick={() => handleCourseNavigate(courseItem?._id)}
                 className="border rounded-lg overflow-hidden shadow cursor-pointer"
               >
