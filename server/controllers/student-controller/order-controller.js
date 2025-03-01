@@ -23,15 +23,15 @@ const createOrder = async (req, res) => {
       token, // Khalti payment token from frontend
     } = req.body;
 
-    // Khalti API credentials
-    const khaltiSecretKey = "4e7efd1b1df14733bdf04c0f83f0a031"; // Live Secret Key
+    // Use environment variable for secret key
+    const khaltiSecretKey = process.env.KHALTI_SECRET_KEY;
 
-    // Prepare Khalti verification request
-    const khaltiVerifyUrl = "https://khalti.com/api/v2/payment/verify/";
+    // Khalti Verification API
+    const khaltiVerifyUrl = "https://a.khalti.com/api/v2/payment/verify/";
 
     const verifyData = {
       token: token,
-      amount: coursePricing * 100, // Khalti uses paisa (1 NPR = 100 paisa)
+      amount: coursePricing * 100, // Khalti requires amount in paisa
     };
 
     const headers = {
@@ -42,14 +42,15 @@ const createOrder = async (req, res) => {
     // Verify payment with Khalti API
     const response = await axios.post(khaltiVerifyUrl, verifyData, { headers });
 
-    if (response.data.state.name !== "Completed") {
+    // Ensure response has correct state
+    if (!response.data.state || response.data.state.name !== "Completed") {
       return res.status(400).json({
         success: false,
         message: "Payment verification failed!",
       });
     }
 
-    // Create order after successful payment
+    // Create Order
     const newlyCreatedCourseOrder = new Order({
       userId,
       userName,
@@ -75,7 +76,7 @@ const createOrder = async (req, res) => {
       orderId: newlyCreatedCourseOrder._id,
     });
   } catch (err) {
-    console.error("Khalti Payment Error:", err);
+    console.error("Khalti Payment Error:", err.response?.data || err.message);
     res.status(500).json({
       success: false,
       message: "Error processing Khalti payment!",
@@ -161,13 +162,13 @@ const initiateKhaltiPayment = async (req, res) => {
   try {
     const { userId, coursePricing, purchaseOrderId, purchaseOrderName } = req.body;
 
-    const khaltiInitiateUrl = "https://sandbox.khalti.com/api/v2/epayment/initiate/";
-    const khaltiSecretKey = "4e7efd1b1df14733bdf04c0f83f0a031"; // Live Secret Key
+    const khaltiInitiateUrl = "https://a.khalti.com/api/v2/epayment/initiate/";
+    const khaltiSecretKey = process.env.KHALTI_SECRET_KEY; // Use env variable
 
     const requestBody = {
       return_url: "https://your-frontend.com/payment-success",
       website_url: "https://your-website.com",
-      amount: coursePricing * 100, // Khalti requires amount in paisa
+      amount: coursePricing * 100, // Convert to paisa
       purchase_order_id: purchaseOrderId,
       purchase_order_name: purchaseOrderName,
       customer_info: {
@@ -180,7 +181,7 @@ const initiateKhaltiPayment = async (req, res) => {
       "Content-Type": "application/json",
     };
 
-    // Initiate Payment Request
+    // Correct Axios Request
     const response = await axios.post(khaltiInitiateUrl, requestBody, { headers });
 
     res.status(200).json({
@@ -190,13 +191,14 @@ const initiateKhaltiPayment = async (req, res) => {
       payment_url: response.data.payment_url, // URL for user to complete payment
     });
   } catch (error) {
-    console.error("Khalti Initiation Error:", error);
+    console.error("Khalti Initiation Error:", error.response?.data || error.message);
     res.status(500).json({
       success: false,
       message: "Error initiating Khalti payment!",
     });
   }
 };
+
 
 module.exports = { createOrder, capturePaymentAndFinalizeOrder, initiateKhaltiPayment };
 

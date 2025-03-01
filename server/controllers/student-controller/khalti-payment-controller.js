@@ -11,7 +11,7 @@ const processKhaltiPayment = async (req, res) => {
     console.log("Received Khalti payment:", { token, amount });
 
     // Khalti verification API endpoint
-    const khaltiUrl = "https://khalti.com/api/v2/payment/verify/";
+    const khaltiUrl = "https://a.khalti.com/api/v2/payment/verify/";
     const khaltiSecretKey = "f251ac61c4134b5b91f1374c11154259"; // Replace this with your actual Khalti secret key
 
     const response = await axios.post(

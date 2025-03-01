@@ -69,6 +69,7 @@ function StudentViewCourseDetailsPage() {
       productName: studentViewCourseDetails?.title,
       productUrl: window.location.href,
       amount: coursePrice,
+      sandbox:true,
       return_url: "http://localhost:5173/khalti/return", 
       //  // Backend verification URL
        // Replace with your Khalti public key
